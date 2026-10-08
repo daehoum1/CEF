@@ -1,0 +1,59 @@
+# Default configuration for scripts/run_concept_hypergraph.py
+# Any value here can be overridden by the matching CLI flag.
+#
+# Relative paths are resolved against this project's root directory (the
+# parent of configs/), not the current working directory, so the project can
+# be copied or moved anywhere without editing this file. Absolute paths are
+# used as-is; the ones below are placeholders for the image datasets and the
+# cached embeddings, which are not redistributed with this repository.
+
+data:
+  csv_path: /path/to/wikiart/classes_artist_disjoint_fixed.csv   # set to your copy ($CEF_WIKIART_ROOT)
+  image_root: /path/to/wikiart
+  raw_csv: false          # true for MultitaskPainting100k-style pre-processed CSVs
+  min_images: 0
+  top_n_styles: 0
+  selected_styles: null
+
+concepts_json: assets/style_concepts.json
+
+# Where cached VLM image/text embeddings live. Layout expected under each:
+#   <cache_root>/<model_name>_<pretrained>/val_embeddings.npz   (image_embs, text_embs, Y)
+#   <cache_root>/<model_name>_<pretrained>/test_embeddings.npz
+# Defaults to the existing UGSP cache so no re-encoding is needed for the
+# default WikiArt setup.
+cache_root: /path/to/cached_embeddings/wikiart   # $CEF_WIKIART_CACHE
+
+# Reuse UGSP's already-tuned kNN Score Propagation config as a baseline, if
+# present (best_config.json with K/alpha/beta, optional k_graph, per model).
+sp_config_root: /path/to/cached_embeddings/wikiart   # $CEF_WIKIART_CACHE
+sp_default_k_graph: 10   # used when a cached best_config.json predates k_graph tuning
+
+save_dir: results
+
+models:
+  - ["ViT-B-32",        "openai",            "CLIP ViT-B/32 (OpenAI)"]
+  - ["ViT-B-32",        "metaclip_fullcc",   "MetaCLIP ViT-B/32"]
+  - ["EVA02-B-16",      "merged2b_s8b_b131k", "EVA02-CLIP ViT-B/16"]
+  - ["ViT-B-16-SigLIP", "webli",             "SigLIP ViT-B/16"]
+
+# Concept-hypergraph hyperparameter grid (searched on the val split)
+grid:
+  top_r: [50, 100, 200, 300, 500]
+  propagation_steps: [1, 2]
+  beta: [0.5, 1.0, 2.0, 4.0]
+  normalize_incidence: [false, true]
+  # Self-loop weight for the kNN+Concept Hypergraph combined graph, tuned
+  # separately from the plain kNN SP alpha (masking the kNN graph by concept
+  # co-membership sharply increases its sparsity, so the alpha that was
+  # optimal for the unmasked kNN graph usually isn't optimal here).
+  combined_alpha: [0.1, 0.3, 0.5, 0.7, 0.9]
+
+eval:
+  seeds: [42, 43, 44, 45, 46]
+  eval_frac: 0.2
+
+runtime:
+  batch_size: 64
+  seed: 42
+  device: null   # null -> auto (cuda if available else cpu)
